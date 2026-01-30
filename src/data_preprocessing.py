@@ -1,73 +1,85 @@
 import pandas as pd
-import os
+from sklearn.model_selection import train_test_split
+from pathlib import Path
+import logging
 
-BASE_DIR = r
-DATA_PATH = os.path.join(BASE_DIR, "data", "processed", "churn_clean.csv")
+# -------------------------
+# Logging Configuration
+# -------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-df = pd.read_csv(DATA_PATH)
-df.head()
-"""
-Data Preprocessing Module
--------------------------
-Handles raw data loading and cleaning for the
-Telco Customer Churn project.
+# -------------------------
+# Project Paths
+# -------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-Input:
-- data/raw/telco_churn.csv
+RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw" / "churn_raw.csv"
+PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "churn_clean.csv"
 
-Output:
-- data/processed/churn_clean.csv
-"""
-
-import pandas as pd
-import numpy as np
-import os
+# -------------------------
+# Data Contract
+# -------------------------
+TARGET_COL = "Churn"
 
 
-def load_raw_data(path: str) -> pd.DataFrame:
-    """Load raw Telco churn dataset."""
+def load_data(path: Path) -> pd.DataFrame:
+    """Load dataset from disk."""
+    logger.info(f"Loading data from: {path}")
     return pd.read_csv(path)
 
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Core data cleaning steps:
-    - Convert TotalCharges to numeric
-    - Handle missing values
-    - Standardize categorical columns
-    """
-
+    """Clean dataset and enforce schema."""
     df = df.copy()
 
-    # Convert TotalCharges to numeric
-    df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+    if "TotalCharges" in df.columns:
+        df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
 
-    # Missing TotalCharges correspond to tenure = 0
-    df["TotalCharges"].fillna(0.0, inplace=True)
+    df.dropna(inplace=True)
 
-    # Strip whitespace from categorical columns
-    cat_cols = df.select_dtypes(include="object").columns
-    df[cat_cols] = df[cat_cols].apply(lambda x: x.str.strip())
+    if TARGET_COL in df.columns:
+        df[TARGET_COL] = df[TARGET_COL].map({"Yes": 1, "No": 0})
 
     return df
 
 
-def save_clean_data(df: pd.DataFrame, output_path: str) -> None:
-    """Save cleaned dataset to disk."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    df.to_csv(output_path, index=False)
+def split_data(df, test_size=0.2, random_state=42):
+    """Stratified train-test split."""
+    X = df.drop(columns=[TARGET_COL])
+    y = df[TARGET_COL]
+
+    return train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y
+    )
+
+
+def main():
+    """
+    Execute data preprocessing pipeline:
+    raw data -> cleaned data -> saved to processed folder
+    """
+    logger.info("Starting data preprocessing")
+
+    df_raw = load_data(RAW_DATA_PATH)
+    logger.info(f"Raw data shape: {df_raw.shape}")
+
+    df_clean = clean_data(df_raw)
+    logger.info(f"Cleaned data shape: {df_clean.shape}")
+
+    PROCESSED_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df_clean.to_csv(PROCESSED_DATA_PATH, index=False)
+
+    logger.info(f"Cleaned data saved to: {PROCESSED_DATA_PATH}")
+    logger.info("Data preprocessing completed successfully")
 
 
 if __name__ == "__main__":
-
-    BASE_DIR = os.path.dirname(__file__)
-    RAW_DATA_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "telco_churn.csv")
-    OUTPUT_PATH = os.path.join(BASE_DIR, "..", "data", "processed", "churn_clean.csv")
-
-    df_raw = load_raw_data(RAW_DATA_PATH)
-    df_clean = clean_data(df_raw)
-    save_clean_data(df_clean, OUTPUT_PATH)
-
-    print("Data preprocessing completed. Clean file saved to:")
-    print(OUTPUT_PATH)
-
+    main()
