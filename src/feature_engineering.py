@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "churn_clean.csv"
 FEATURES_OUTPUT_PATH = PROJECT_ROOT / "data" / "processed" / "X_features.csv"
+TARGET_OUTPUT_PATH = PROJECT_ROOT / "data" / "processed" / "retention_targets.csv"
 FEATURE_NAMES_PATH = PROJECT_ROOT / "models" / "feature_names.txt"
 
 TARGET_COL = "Churn"
@@ -76,31 +77,41 @@ def save_feature_names(feature_names):
             f.write(f"{name}\n")
 
 
+def save_targets(y):
+    TARGET_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    y.to_csv(TARGET_OUTPUT_PATH, index=False)
+
+
 # -------------------------------------------------------------------
 # Main execution
 # -------------------------------------------------------------------
 def main():
     logging.info("Starting feature engineering")
 
+    # Load cleaned data
     df = pd.read_csv(PROCESSED_DATA_PATH)
     logging.info(f"Loaded cleaned data: {df.shape}")
 
+    # Split features and target
     X, y = split_features_target(df)
-    categorical_cols, numerical_cols = identify_feature_types(X)
 
+    # Identify feature types
+    categorical_cols, numerical_cols = identify_feature_types(X)
     logging.info(f"Categorical features: {len(categorical_cols)}")
     logging.info(f"Numerical features: {len(numerical_cols)}")
 
+    # Encode categoricals and build final feature matrix
     encoded_df, encoder = encode_categoricals(X, categorical_cols)
     X_final = build_feature_matrix(X, encoded_df, numerical_cols)
-
     logging.info(f"Final feature matrix shape: {X_final.shape}")
 
-    # Save outputs
+    # Save aligned artifacts
     X_final.to_csv(FEATURES_OUTPUT_PATH, index=False)
+    save_targets(y)
     save_feature_names(X_final.columns.tolist())
 
     logging.info(f"Feature matrix saved to: {FEATURES_OUTPUT_PATH}")
+    logging.info(f"Targets saved to: {TARGET_OUTPUT_PATH}")
     logging.info(f"Feature names saved to: {FEATURE_NAMES_PATH}")
     logging.info("Feature engineering completed successfully")
 
