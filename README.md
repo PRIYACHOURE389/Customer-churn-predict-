@@ -87,6 +87,7 @@ customer-churn-prediction/
 │   └── 05_evaluation.ipynb
 │
 ├── src/
+|   ├── _init_.py
 │   ├── data_preprocessing.py
 │   ├── feature_engineering.py
 │   ├── train.py
